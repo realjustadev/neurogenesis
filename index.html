@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEUROFLY · Digital Fruit Fly Brain Simulator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🪰</text></svg>">
+<style>
+:root{
+  --bg:#03080b;
+  --bg2:#071016;
+  --panel:rgba(10,22,26,.55);
+  --ink:#d9ffe9;
+  --dim:#6fae94;
+  --faint:#3d6b58;
+  --acc:#3dffb0;
+  --acc2:#5ee6ff;
+  --amber:#ffc247;
+  --violet:#a78bff;
+  --pink:#ff7eb6;
+  --red:#ff5e7a;
+  --line:rgba(61,255,176,.16);
+  --line2:rgba(61,255,176,.08);
+  --mono:ui-monospace,'Cascadia Code','JetBrains Mono',Consolas,'Courier New',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--mono);
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(61,255,176,.28)}
+::-webkit-scrollbar{width:9px}
+::-webkit-scrollbar-track{background:#050b0e}
+::-webkit-scrollbar-thumb{background:#1a3d31;border:2px solid #050b0e;border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:#2a5f4c}
+
+/* ---------- background layers ---------- */
+.grid-bg{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(61,255,176,.07), transparent 60%),
+    radial-gradient(900px 600px at 85% 110%, rgba(94,230,255,.05), transparent 60%),
+    linear-gradient(rgba(61,255,176,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,255,176,.035) 1px, transparent 1px);
+  background-size:auto,auto,52px 52px,52px 52px;
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.10) 3px 4px);
+  mix-blend-mode:overlay;
+}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:22px;
+  padding:10px 22px;
+  background:rgba(3,8,11,.78);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  font-size:11px;letter-spacing:.08em;
+  white-space:nowrap;
+}
+.topbar .brand{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.18em;color:var(--acc)}
+.topbar .brand .orb{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.topbar nav{display:flex;gap:18px;margin-left:8px}
+.topbar nav a{color:var(--dim);text-decoration:none;transition:color .2s}
+.topbar nav a:hover{color:var(--acc)}
+.topbar .spacer{flex:1}
+.topbar .meta{color:var(--faint);display:flex;gap:18px}
+.topbar .meta b{color:var(--dim);font-weight:400}
+.topbar .live{color:var(--acc);display:flex;align-items:center;gap:6px}
+.topbar .live i{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 1.4s infinite}
+@media(max-width:960px){.topbar .meta span.hide-m{display:none}.topbar nav{display:none}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;height:96vh;min-height:600px;z-index:1;user-select:none}
+#brain{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.hero-inner{
+  position:absolute;inset:0;pointer-events:none;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:0 6vw 9vh;
+}
+.eyebrow{font-size:11px;letter-spacing:.32em;color:var(--acc);margin-bottom:18px;display:flex;align-items:center;gap:10px;animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.4}98%{opacity:1}99%{opacity:.55}}
+.eyebrow::before{content:"";width:34px;height:1px;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+.hero h1{
+  font-size:clamp(30px,5.2vw,66px);line-height:1.14;font-weight:800;
+  letter-spacing:.02em;text-shadow:0 0 40px rgba(61,255,176,.25);
+}
+.hero h1 em{font-style:normal;color:var(--acc);text-shadow:0 0 26px rgba(61,255,176,.55)}
+.hero .sub{max-width:620px;margin-top:20px;color:var(--dim);font-size:13px;line-height:2}
+.hero .cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+.btn{
+  pointer-events:auto;cursor:pointer;
+  font-family:var(--mono);font-size:12.5px;letter-spacing:.14em;
+  padding:13px 24px;border:1px solid var(--acc);color:var(--acc);
+  background:rgba(61,255,176,.07);text-decoration:none;
+  position:relative;transition:.22s;overflow:hidden;
+}
+.btn:hover{background:var(--acc);color:#03110a;box-shadow:0 0 26px rgba(61,255,176,.45)}
+.btn.ghost{border-color:rgba(111,174,148,.5);color:var(--dim);background:transparent}
+.btn.ghost:hover{border-color:var(--acc2);color:var(--acc2);background:rgba(94,230,255,.06);box-shadow:0 0 22px rgba(94,230,255,.3)}
+.hero .hint{
+  position:absolute;right:6vw;bottom:9vh;text-align:right;
+  color:var(--faint);font-size:11px;line-height:2.1;letter-spacing:.1em;
+}
+.hero .hint b{color:var(--dim);font-weight:400}
+.corner{position:absolute;width:22px;height:22px;border:1px solid rgba(61,255,176,.4);pointer-events:none}
+.corner.tl{top:86px;left:22px;border-right:0;border-bottom:0}
+.corner.tr{top:86px;right:22px;border-left:0;border-bottom:0}
+.corner.bl{bottom:22px;left:22px;border-right:0;border-top:0}
+.corner.br{bottom:22px;right:22px;border-left:0;border-top:0}
+#flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(closest-side at 50% 45%, transparent 55%, rgba(255,194,71,.22));transition:opacity .18s}
+#flash.on{opacity:1;transition:opacity .04s}
+
+/* glitch title */
+.glitch{position:relative;display:inline-block}
+.glitch::before,.glitch::after{
+  content:attr(data-text);position:absolute;left:0;top:0;width:100%;
+  opacity:0;pointer-events:none;
+}
+.glitch::before{color:var(--acc2);animation:gl1 5s infinite steps(1)}
+.glitch::after{color:var(--pink);animation:gl2 5s infinite steps(1)}
+@keyframes gl1{
+  0%,90%{opacity:0}
+  91%{opacity:.85;transform:translate(-4px,-1px);clip-path:inset(12% 0 58% 0)}
+  94%{opacity:.85;transform:translate(3px,1px);clip-path:inset(62% 0 12% 0)}
+  96%,100%{opacity:0}
+}
+@keyframes gl2{
+  0%,90%{opacity:0}
+  92%{opacity:.8;transform:translate(4px,1px);clip-path:inset(48% 0 28% 0)}
+  95%{opacity:.8;transform:translate(-3px,-1px);clip-path:inset(8% 0 74% 0)}
+  97%,100%{opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .glitch::before,.glitch::after,.eyebrow{animation:none}
+}
+
+/* ---------- sections ---------- */
+main{position:relative;z-index:1}
+section.block{max-width:1180px;margin:0 auto;padding:96px 6vw 30px;scroll-margin-top:70px}
+.shead{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.shead .idx{color:var(--acc);font-size:12px;letter-spacing:.2em}
+.shead .lab{color:var(--faint);font-size:11px;letter-spacing:.28em}
+.shead .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+section h2{font-size:clamp(21px,2.6vw,30px);letter-spacing:.04em;margin-bottom:10px;font-weight:800}
+section .desc{color:var(--dim);font-size:12.5px;line-height:2;max-width:640px;margin-bottom:36px}
+
+.panel{
+  border:1px solid var(--line);background:var(--panel);
+  backdrop-filter:blur(4px);position:relative;
+}
+.panel::before,.panel::after{
+  content:"";position:absolute;width:8px;height:8px;border:1px solid var(--acc);opacity:.7;
+}
+.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.panel .phead{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;
+  border-bottom:1px solid var(--line2);font-size:10.5px;letter-spacing:.24em;color:var(--dim);
+}
+.panel .phead i{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse 1.6s infinite;box-shadow:0 0 8px var(--acc)}
+
+/* telemetry */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.stat{padding:18px 18px 12px;transition:border-color .3s}
+.stat:hover{border-color:rgba(61,255,176,.45)}
+.stat .sl{font-size:10.5px;letter-spacing:.2em;color:var(--faint);display:flex;justify-content:space-between}
+.stat .sv{font-size:clamp(24px,2.6vw,34px);font-weight:700;color:var(--acc);margin:10px 0 6px;text-shadow:0 0 18px rgba(61,255,176,.35);font-variant-numeric:tabular-nums}
+.stat:nth-child(2) .sv{color:var(--acc2);text-shadow:0 0 18px rgba(94,230,255,.3)}
+.stat:nth-child(3) .sv{color:var(--violet);text-shadow:0 0 18px rgba(167,139,255,.3)}
+.stat:nth-child(4) .sv{color:var(--amber);text-shadow:0 0 18px rgba(255,194,71,.3)}
+.stat canvas{width:100%;height:34px;display:block;opacity:.9}
+
+/* console */
+.console-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;align-items:stretch}
+.stim-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:18px}
+.stim{
+  cursor:pointer;text-align:left;font-family:var(--mono);color:var(--ink);
+  border:1px solid var(--line);background:rgba(6,15,18,.6);padding:18px 16px;
+  transition:.22s;position:relative;overflow:hidden;
+}
+.stim .ic{font-size:20px;display:block;margin-bottom:10px;filter:drop-shadow(0 0 8px rgba(61,255,176,.4))}
+.stim .sn{font-size:13px;font-weight:700;letter-spacing:.1em;color:var(--acc)}
+.stim .sd{display:block;margin-top:8px;font-size:11px;line-height:1.8;color:var(--faint);transition:color .22s}
+.stim:hover{border-color:var(--acc);background:rgba(61,255,176,.08);transform:translateY(-2px);box-shadow:0 6px 24px rgba(61,255,176,.12)}
+.stim:hover .sd{color:var(--dim)}
+.stim:active{transform:translateY(0) scale(.98)}
+.stim.fired{animation:fired .5s}
+@keyframes fired{0%{box-shadow:0 0 0 0 rgba(61,255,176,.55)}100%{box-shadow:0 0 0 18px rgba(61,255,176,0)}}
+.log-panel{display:flex;flex-direction:column;min-height:100%}
+#stream{padding:14px 16px;overflow-y:auto;flex:1;max-height:340px;min-height:300px}
+.log-line{font-size:11px;line-height:1.7;padding:5px 0;border-bottom:1px dashed rgba(61,255,176,.07);animation:slidein .4s;display:flex;gap:10px;align-items:baseline}
+@keyframes slidein{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.log-line .lt{color:#2f5a49;flex-shrink:0}
+.log-line .tag{flex-shrink:0;font-size:10px;padding:1px 7px;border:1px solid;letter-spacing:.1em}
+.tag-sense{color:var(--acc2);border-color:rgba(94,230,255,.4)}
+.tag-motor{color:var(--amber);border-color:rgba(255,194,71,.4)}
+.tag-learn{color:var(--pink);border-color:rgba(255,126,182,.4)}
+.tag-sys{color:var(--faint);border-color:rgba(111,174,148,.35)}
+.tag-stim{color:var(--acc);border-color:rgba(61,255,176,.45)}
+.log-line .lm{color:var(--dim);word-break:break-word}
+
+/* atlas */
+.atlas-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+.atlas-viz{position:relative;min-height:520px}
+#brain2{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+.atlas-viz .vhint{position:absolute;left:14px;bottom:12px;font-size:10px;color:var(--faint);letter-spacing:.14em;pointer-events:none}
+.region-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px}
+.region{
+  cursor:pointer;border:1px solid var(--line2);background:rgba(6,15,18,.5);
+  padding:12px 14px;transition:.2s;position:relative;
+}
+.region:last-child{grid-column:1/-1}
+.region .rn{font-size:12.5px;font-weight:700;letter-spacing:.08em}
+.region .re{font-size:9.5px;letter-spacing:.2em;color:var(--faint);margin-top:4px}
+.region .rc{position:absolute;top:10px;right:12px;width:8px;height:8px;border-radius:50%}
+.region:hover{border-color:var(--line);transform:translateX(3px)}
+.region.on{border-color:var(--acc);background:rgba(61,255,176,.08);box-shadow:0 0 20px rgba(61,255,176,.12) inset}
+#region-info{margin:0 16px 16px;padding:16px;border:1px solid var(--line2);background:rgba(6,15,18,.5)}
+#region-info .ri-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:10px}
+#region-info .ri-cn{font-size:15px;font-weight:800;color:var(--acc)}
+#region-info .ri-en{font-size:10px;letter-spacing:.24em;color:var(--faint);text-align:right}
+#region-info .ri-desc{font-size:11.5px;line-height:1.95;color:var(--dim);min-height:66px}
+#region-info .ri-stats{display:flex;gap:22px;margin-top:12px;font-size:10.5px;color:var(--faint);letter-spacing:.1em;flex-wrap:wrap}
+#region-info .ri-stats b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums}
+.actbar{margin-top:12px;height:3px;background:rgba(61,255,176,.12);position:relative;overflow:hidden}
+.actbar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);box-shadow:0 0 10px var(--acc);animation:actflow 2.4s ease-in-out infinite alternate}
+@keyframes actflow{from{width:18%}to{width:87%}}
+
+/* how */
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.how{padding:24px 20px;transition:.25s}
+.how:hover{border-color:rgba(61,255,176,.4);transform:translateY(-4px)}
+.how .hn{color:var(--faint);font-size:11px;letter-spacing:.2em}
+.how h3{margin:14px 0 4px;font-size:16px;letter-spacing:.06em}
+.how .he{font-size:10px;letter-spacing:.22em;color:var(--acc);margin-bottom:14px}
+.how p{font-size:11.5px;line-height:2;color:var(--dim)}
+.how .wave{margin-top:16px;height:26px;width:100%;opacity:.8}
+
+/* roadmap */
+.rm{border:1px solid var(--line2);border-top:0;transition:background .25s}
+.rm:first-of-type{border-top:1px solid var(--line2)}
+.rm:hover{background:rgba(61,255,176,.045)}
+.rm-in{display:grid;grid-template-columns:70px 1fr auto;gap:18px;align-items:center;padding:20px 22px}
+.rm .ri{color:var(--faint);font-size:20px;font-weight:300}
+.rm.done .ri{color:var(--acc)}
+.rm h4{font-size:14px;letter-spacing:.06em;font-weight:700}
+.rm p{color:var(--faint);font-size:11px;margin-top:6px;line-height:1.8}
+.chip{font-size:10px;letter-spacing:.18em;padding:5px 12px;border:1px solid;white-space:nowrap}
+.chip.done{color:var(--acc);border-color:rgba(61,255,176,.5);background:rgba(61,255,176,.07)}
+.chip.doing{color:var(--amber);border-color:rgba(255,194,71,.5);background:rgba(255,194,71,.06);animation:pulse 2.2s infinite}
+.chip.plan{color:var(--faint);border-color:rgba(111,174,148,.3)}
+
+/* limits */
+.limits{padding:26px 26px 22px}
+.limits li{list-style:none;display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed rgba(61,255,176,.08);font-size:12px;line-height:1.9;color:var(--dim)}
+.limits li:last-child{border-bottom:0}
+.limits li::before{content:"▲";color:var(--amber);font-size:9px;margin-top:6px;flex-shrink:0}
+.limits b{color:var(--ink);font-weight:400}
+
+/* footer */
+footer{position:relative;z-index:1;margin-top:90px;border-top:1px solid var(--line);padding:44px 6vw 54px;background:rgba(3,8,11,.7)}
+footer .fgrid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:30px}
+footer .fb{color:var(--acc);font-weight:800;letter-spacing:.2em;font-size:14px}
+footer p{color:var(--faint);font-size:11px;line-height:2;margin-top:12px;max-width:420px}
+footer h5{color:var(--dim);font-size:10.5px;letter-spacing:.26em;margin-bottom:14px;font-weight:400}
+footer a{display:block;color:var(--dim);font-size:11.5px;text-decoration:none;padding:4px 0;transition:.2s}
+footer a:hover{color:var(--acc);transform:translateX(4px)}
+footer .fbottom{max-width:1180px;margin:34px auto 0;padding-top:18px;border-top:1px solid var(--line2);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#2f5a49;font-size:10.5px;letter-spacing:.12em}
+
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s ease}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .reveal{opacity:1;transform:none;transition:none}
+  body::after{display:none}
+}
+
+@media(max-width:900px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .console-grid,.atlas-grid,.how-grid{grid-template-columns:1fr}
+  .atlas-viz{min-height:380px}
+  footer .fgrid{grid-template-columns:1fr}
+  .hero .hint{display:none}
+  .rm-in{grid-template-columns:50px 1fr;grid-template-rows:auto auto}
+  .rm .chip{grid-column:2}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- ======= top status bar ======= -->
+<header class="topbar">
+  <div class="brand"><span class="orb"></span>NEUROFLY</div>
+  <nav>
+    <a href="#telemetry">TELEMETRY</a>
+    <a href="#console">CONSOLE</a>
+    <a href="#atlas">ATLAS</a>
+    <a href="#how">HOW</a>
+    <a href="#roadmap">ROADMAP</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="meta">
+    <span>SPECIMEN DROSOPHILA-01 · DIGITAL TWIN</span>
+    <span class="hide-m">NEURONS <b>139,255</b></span>
+    <span class="hide-m">SYNAPSES <b>≈5.0×10⁷</b></span>
+    <span id="clock">--:--:--</span>
+  </div>
+  <div class="live"><i></i>LIVE</div>
+</header>
+
+<!-- ======= hero ======= -->
+<section class="hero" id="top">
+  <canvas id="brain"></canvas>
+  <div id="flash"></div>
+  <span class="corner tl"></span><span class="corner tr"></span>
+  <span class="corner bl"></span><span class="corner br"></span>
+  <div class="hero-inner">
+    <div class="eyebrow">DIGITAL DROSOPHILA · REAL-TIME CONNECTOME</div>
+    <h1>A fruit fly's 139,255 neurons<br><em class="glitch" data-text="taking flight in your browser">taking flight in your browser</em></h1>
+    <p class="sub">NEUROFLY is a fruit fly whole-brain simulator that runs entirely in your browser — the optic lobes, mushroom bodies, central complex and antennal lobes, plus the cervical connective running down to the nerve cord. Every spike happens on your device. Drag it. Stimulate it. Watch it take flight.</p>
+    <div class="cta">
+      <a class="btn" href="#console">Open the Stim Console →</a>
+      <a class="btn ghost" href="#atlas">Explore the Brain Atlas</a>
+    </div>
+  </div>
+  <div class="hint">
+    <b>DRAG</b> rotate the specimen<br>
+    <b>CURSOR</b> electrically stimulate neurons<br>
+    <b>CLICK</b> trigger a spike burst<br>
+    <b>GHOST</b> body outline · anatomy reference only
+  </div>
+</section>
+
+<main>
+  <!-- ======= 01 telemetry ======= -->
+  <section class="block" id="telemetry">
+    <div class="shead reveal"><span class="idx">01</span><span class="lab">TELEMETRY</span><span class="rule"></span></div>
+    <h2 class="reveal">Live Telemetry</h2>
+    <p class="desc reveal">These readouts are recomputed every frame by the simulation core on this page. Nothing is pre-recorded — every spike that fly is firing right now is being calculated and written here, live.</p>
+    <div class="stat-grid">
+      <div class="panel stat reveal"><div class="sl"><span>PEAK FIRING RATE</span><span>SPIKES/S</span></div><div class="sv" id="stat-spike">--</div><canvas id="spark-spike"></canvas></div>
+      <div class="panel stat reveal"><div class="sl"><span>MEAN MEMBRANE POTENTIAL</span><span>mV</span></div><div class="sv" id="stat-volt">--</div><canvas id="spark-volt"></canvas></div>
+      <div class="panel stat reveal"><div class="sl"><span>ACTIVE SYNAPSES</span><span>COUNT</span></div><div class="sv" id="stat-syn">--</div><canvas id="spark-syn"></canvas></div>
+      <div class="panel stat reveal"><div class="sl"><span>DOPAMINE LEVEL</span><span>nM</span></div><div class="sv" id="stat-dopa">--</div><canvas id="spark-dopa"></canvas></div>
+    </div>
+    <div class="panel reveal">
+      <div class="phead"><i></i>MULTI-CHANNEL RECORDING · LOCAL FIELD POTENTIAL</div>
+      <canvas id="eeg" style="width:100%;height:170px;display:block"></canvas>
+    </div>
+  </section>
+
+  <!-- ======= 02 stim console ======= -->
+  <section class="block" id="console">
+    <div class="shead reveal"><span class="idx">02</span><span class="lab">STIMULATION CONSOLE</span><span class="rule"></span></div>
+    <h2 class="reveal">Stimulation Console</h2>
+    <p class="desc reveal">Inject one of four fruit-fly sensory stimuli and watch the optic lobes, antennal lobes and mushroom bodies react in a chain. Every command you fire is written to the event stream on the right.</p>
+    <div class="console-grid">
+      <div class="panel reveal">
+        <div class="phead"><i></i>STIM PROTOCOLS</div>
+        <div class="stim-grid">
+          <button class="stim" data-stim="grating">
+            <span class="ic">👁️</span><span class="sn">Optic Flow</span>
+            <span class="sd">Project a moving grating onto both optic lobes. Direction-selective T4/T5 units erupt layer by layer, driving the optomotor turning reflex.</span>
+          </button>
+          <button class="stim" data-stim="odor">
+            <span class="ic">🌸</span><span class="sn">Odor Puff</span>
+            <span class="sd">Release an acetate odor pulse. About 50 antennal-lobe glomeruli light up in an odor-specific combinatorial pattern.</span>
+          </button>
+          <button class="stim" data-stim="memory">
+            <span class="ic">💾</span><span class="sn">Memory Write</span>
+            <span class="sd">Odor–shock pairing: PPL1 dopamine neurons carve an aversive memory trace onto the mushroom body's α/β lobes.</span>
+          </button>
+          <button class="stim" data-stim="ltp">
+            <span class="ic">🧬</span><span class="sn">Potentiation</span>
+            <span class="sd">Trigger long-term potentiation (LTP). Connection weights rise across the whole brain and every tract brightens.</span>
+          </button>
+        </div>
+      </div>
+      <div class="panel log-panel reveal">
+        <div class="phead"><i></i>EVENT STREAM</div>
+        <div id="stream"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= 03 brain atlas ======= -->
+  <section class="block" id="atlas">
+    <div class="shead reveal"><span class="idx">03</span><span class="lab">REGION ATLAS</span><span class="rule"></span></div>
+    <h2 class="reveal">Brain Atlas</h2>
+    <p class="desc reveal">The specimen is partitioned into nine functional regions following fly neuroanatomy. Select one and its structure lights up alone — the full connectome holds 139,255 neurons; about 1,800 sampled units are rendered here.</p>
+    <div class="atlas-grid">
+      <div class="panel atlas-viz reveal">
+        <canvas id="brain2"></canvas>
+        <div class="vhint">DRAG TO ROTATE</div>
+      </div>
+      <div class="panel reveal">
+        <div class="phead"><i></i>REGIONS</div>
+        <div class="region-list" id="region-list"></div>
+        <div id="region-info">
+          <div class="ri-head"><span class="ri-cn" id="ri-cn">--</span><span class="ri-en" id="ri-en">--</span></div>
+          <div class="ri-desc" id="ri-desc"></div>
+          <div class="ri-stats">
+            <span>NEURONS <b id="ri-count">--</b></span>
+            <span>SHARE <b id="ri-pct">--</b></span>
+            <span>STATUS <b id="ri-state">LIVE</b></span>
+          </div>
+          <div class="actbar"><i id="ri-bar"></i></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= 04 how it works ======= -->
+  <section class="block" id="how">
+    <div class="shead reveal"><span class="idx">04</span><span class="lab">HOW IT WORKS</span><span class="rule"></span></div>
+    <h2 class="reveal">How It Works</h2>
+    <p class="desc reveal">Three subsystems close the loop: the world comes in as electricity, electricity becomes weights, and weights become action.</p>
+    <div class="how-grid">
+      <div class="panel how reveal">
+        <div class="hn">SUBSYSTEM A</div>
+        <h3>Sensory Encoding</h3><div class="he">OPTIC LOBE ENCODING</div>
+        <p>The compound eye's optical flow is decomposed layer by layer: the medulla extracts edges and orientation, while each T4/T5 unit swears loyalty to a single direction of motion. A fly doesn't see a picture — it sees a vector field in flux.</p>
+        <canvas class="wave" data-wave="sense"></canvas>
+      </div>
+      <div class="panel how reveal">
+        <div class="hn">SUBSYSTEM B</div>
+        <h3>Synaptic Plasticity</h3><div class="he">MUSHROOM BODY PLASTICITY</div>
+        <p>About 4,000 Kenyon cells weave odor cues into sparse codes; PPL1/PAM dopamine neurons act as the teachers — prediction error decides which weights rise and which fall. Sugar rewards, shock punishes, and the two signals carve opposite traces.</p>
+        <canvas class="wave" data-wave="learn"></canvas>
+      </div>
+      <div class="panel how reveal">
+        <div class="hn">SUBSYSTEM C</div>
+        <h3>Motor Decoding</h3><div class="he">MOTOR DECODING</div>
+        <p>The central complex issues heading and gait commands; the giant fiber pathway fires at a touch, compressing the escape jump into milliseconds; and the ventral nerve cord translates it all into every step of six legs and every beat of two wings.</p>
+        <canvas class="wave" data-wave="motor"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= 05 roadmap ======= -->
+  <section class="block" id="roadmap">
+    <div class="shead reveal"><span class="idx">05</span><span class="lab">ROADMAP</span><span class="rule"></span></div>
+    <h2 class="reveal">Incubation Plan</h2>
+    <p class="desc reveal">Eight stages, from a single synthetic neuron to whole-brain scale. The statuses are honest: finished work never pretends to be in progress.</p>
+    <div class="reveal">
+      <div class="rm done"><div class="rm-in"><span class="ri">01</span><div><h4>Neuron Morphology Synthesis</h4><p>Generate morphological units with axon–dendrite polarity and build the spiking dynamics model.</p></div><span class="chip done">DONE</span></div></div>
+      <div class="rm done"><div class="rm-in"><span class="ri">02</span><div><h4>Sparse Connectome Reconstruction</h4><p>Build a sparse wiring diagram of ≈5.0×10⁷ synapses from distance and regional priors.</p></div><span class="chip done">DONE</span></div></div>
+      <div class="rm done"><div class="rm-in"><span class="ri">03</span><div><h4>Real-Time Spiking Dynamics</h4><p>Membrane potentials solved frame by frame in the browser; action potentials propagate as pulses along synapses.</p></div><span class="chip done">DONE</span></div></div>
+      <div class="rm doing"><div class="rm-in"><span class="ri">04</span><div><h4>Visual Stream Encoding</h4><p>Gratings and optic flow: make the specimen produce real tracking reflexes to moving patterns.</p></div><span class="chip doing">IN PROGRESS</span></div></div>
+      <div class="rm doing"><div class="rm-in"><span class="ri">05</span><div><h4>Glomerular Odor Map</h4><p>An odor-to-pattern map for all 50 glomeruli, ready to inject any odor fingerprint.</p></div><span class="chip doing">IN PROGRESS</span></div></div>
+      <div class="rm"><div class="rm-in"><span class="ri">06</span><div><h4>PPL1/PAM Reward Gating</h4><p>Full dopamine teaching signals: dual-pathway consolidation of aversive and reward memories.</p></div><span class="chip plan">PLANNED</span></div></div>
+      <div class="rm"><div class="rm-in"><span class="ri">07</span><div><h4>Whole-Brain Scale-Up</h4><p>Scale the GPU solver to 10⁶ neurons / 10⁸ synapses.</p></div><span class="chip plan">PLANNED</span></div></div>
+      <div class="rm"><div class="rm-in"><span class="ri">08</span><div><h4>Open API & Connectome Dataset</h4><p>Spike records, connectome and weight snapshots packaged for anyone to download and study.</p></div><span class="chip plan">PLANNED</span></div></div>
+    </div>
+  </section>
+
+  <!-- ======= 06 stated plainly ======= -->
+  <section class="block" id="limits">
+    <div class="shead reveal"><span class="idx">06</span><span class="lab">STATED PLAINLY</span><span class="rule"></span></div>
+    <h2 class="reveal">What It Is Not, Plainly</h2>
+    <p class="desc reveal">Stating the limits clearly is part of the experiment.</p>
+    <ul class="panel limits reveal">
+      <li><span><b>No consciousness.</b> The spiking of 139,255 digital neurons is just math running. This fly has no subjective experience, no feelings, no pain.</span></li>
+      <li><span><b>Not a real fly.</b> The structure is synthesized in code from public-connectomics priors — it is not based on scans of any real fruit fly.</span></li>
+      <li><span><b>The numbers are a demo.</b> Firing rates, membrane potentials and transmitter levels are generated live by this page — they are not experimental records and support no scientific claim.</span></li>
+      <li><span><b>It is fully local.</b> No server, no uploads. All computation happens on the device that opened this page — close the tab and it dies.</span></li>
+      <li><span><b>"Learning" is curve-fitting.</b> The weights change and the behavior changes, but this remains far from anything you would strictly call intelligence.</span></li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <div class="fgrid">
+    <div>
+      <div class="fb">◉ NEUROFLY</div>
+      <p>A fruit fly whole-brain simulator that runs in your browser. With respect to FlyWire and the open science of connectomics — the people rebuilding a fly brain one synapse at a time.</p>
+    </div>
+    <div>
+      <h5>INDEX</h5>
+      <a href="#telemetry">01 · Live Telemetry</a>
+      <a href="#console">02 · Stim Console</a>
+      <a href="#atlas">03 · Brain Atlas</a>
+      <a href="#roadmap">05 · Incubation Plan</a>
+    </div>
+    <div>
+      <h5>TECH</h5>
+      <a href="#top">Canvas 2D render core</a>
+      <a href="#top">Zero dependencies · Single file</a>
+      <a href="#limits">Transparency statement</a>
+    </div>
+  </div>
+  <div class="fbottom">
+    <span>NEUROFLY DROSOPHILA-01 · PURE FRONT-END DEMO</span>
+    <span>All data generated in real time · No real organism involved</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+'use strict';
+const TAU = Math.PI*2;
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
+function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hexRGB(h){const n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255];}
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= fly brain region definitions ================= */
+const REGIONS = {
+  medulla: {name:'Optic Lobe · Medulla', code:'MEDULLA', color:'#5ee6ff', count:48610, br:1.15, sz:1.05,
+    desc:'The largest station of the visual pathway. Light is broken down here into edges, orientation and motion, arranged in a precise retinotopic map — the world a fly sees is rebuilt column by column in the medulla.'},
+  lobula:  {name:'Optic Lobe · Lobula Complex', code:'LOBULA COMPLEX', color:'#a78bff', count:16420, br:1.15, sz:1.05,
+    desc:'The terminus of motion vision. Each T4/T5 unit fires only for one direction of optic flow; the lobula plate reads that population vector, and the fly knows whether it is flying forward or being blown off course.'},
+  proto:   {name:'Protocerebrum', code:'PROTOCEREBRUM', color:'#3dffb0', count:46725, br:.7, sz:.9,
+    desc:'The bulk of the central brain. Visual, olfactory and proprioceptive streams converge here, and so does the arbitration between action and inhibition — it is also where whole-brain arousal begins.'},
+  mb:      {name:'Mushroom Body', code:'MUSHROOM BODY', color:'#ff7eb6', count:4240, br:1.2, sz:1.2,
+    desc:'The core of learning and memory. About 4,000 Kenyon cells weave odors into sparse codes while PPL1/PAM dopamine neurons act as teachers — telling it where the sugar was, and where the shock happened.'},
+  cx:      {name:'Central Complex', code:'CENTRAL COMPLEX', color:'#ffc247', count:3120, br:1.25, sz:1.2,
+    desc:"The fly's compass and metronome. A bump of activity slides around the ellipsoid body to track heading; the fan-shaped body integrates speed column by column, driving gait and the switch into sleep."},
+  al:      {name:'Antennal Lobe', code:'ANTENNAL LOBE', color:'#7cff6b', count:2610, br:1.15, sz:1.15,
+    desc:'The first stop for smell. About 50 glomeruli decompose thousands of airborne molecules into glowing patterns — every odor is one specific combination lighting up.'},
+  lh:      {name:'Lateral Horn', code:'LATERAL HORN', color:'#ff9e5e', count:1180, br:1.15, sz:1.15,
+    desc:'The fast lane for innate odors. No learning required — it translates pheromones and danger signals straight into the instinct to approach or flee.'},
+  sega:    {name:'Subesophageal Ganglion', code:'SEGA', color:'#ff5e7a', count:4350, br:1.05, sz:1.05,
+    desc:"The taste center wrapped around the esophagus. Sugar, salt and bitter are judged here, deciding proboscis extension or refusal — the fly's entire 'eat or don't eat.'"},
+  vnc:     {name:'Cervical Connective & VNC', code:'CERVICAL / VNC', color:'#00e5c3', count:12000, br:1, sz:1,
+    desc:'The cable to the body. Every command the brain issues travels down the neck, where the segmented ganglia of the ventral nerve cord translate it into the gait of six legs and the beat of two wings.'}
+};
+
+/* ================= build the fly brain point cloud ================= */
+function buildFlyBrain(){
+  const R=mulberry(90210);
+  const pts=[];
+  const add=(x,y,z,r)=>pts.push({p:[x,y,z], r:r, e:0, cool:0, edges:[], idx:pts.length});
+  const J=a=>(R()-.5)*a;
+
+  // ---- protocerebrum (central brain, two hemispheres) ----
+  for(let i=0;i<380;i++){
+    const u=R()*TAU, v=Math.acos(2*R()-1);
+    const dx=Math.sin(v)*Math.cos(u), dy=Math.cos(v), dz=Math.sin(v)*Math.sin(u);
+    const hemi=dx<0?-1:1;
+    let x=hemi*(0.30+0.70*Math.pow(Math.abs(dx),0.8));
+    const bottom=clamp((-dy-0.3)/0.6,0,1);
+    x*=1-0.5*bottom;
+    const wr=Math.sin(8*Math.atan2(x,dz)+dy*4);
+    const rr=1+0.03*wr;
+    add(x*0.34*rr, 0.06+dy*0.30*rr, dz*0.40*rr, 'proto');
+  }
+  // ---- optic lobes (both sides, 4 nested curved shells: medulla x2 + lobula complex x2) ----
+  for(let side=-1;side<=1;side+=2){
+    const cx0=side*0.62, cy0=0.02, cz0=-0.06;
+    for(let L=0;L<4;L++){
+      const aL=0.16+L*0.08, bL=0.30+L*0.05, cL=0.32+L*0.06;
+      for(let i=0;i<70;i++){
+        const lon=(R()*2-1)*1.05, lat=(R()*2-1)*1.05;
+        const ox=Math.cos(lat)*Math.cos(lon), oy=Math.sin(lat), oz=Math.cos(lat)*Math.sin(lon);
+        const stri=1+0.025*Math.sin(lon*38+L*2);
+        add(cx0+side*ox*aL*stri, cy0+oy*bL, cz0+oz*cL*stri, L<2?'medulla':'lobula');
+      }
+    }
+    // optic stalk (connects central brain to optic lobe)
+    for(let i=0;i<10;i++){
+      add(side*(0.36+R()*0.18), 0.02+J(0.05), -0.02+J(0.08), 'medulla');
+    }
+  }
+  // ---- mushroom bodies (both sides: calyx + peduncle + alpha/beta/gamma lobes) ----
+  for(let side=-1;side<=1;side+=2){
+    for(let i=0;i<32;i++){ // calyx (Kenyon cell bodies)
+      const a=R()*TAU, r2=Math.sqrt(R())*0.085;
+      add(side*0.19+Math.cos(a)*r2, 0.34+Math.sin(a)*r2*0.8, -0.02+J(0.07), 'mb');
+    }
+    for(let i=0;i<34;i++){ // peduncle (descending stalk)
+      const t=R();
+      add(side*(0.185-0.045*t)+J(0.03), 0.30-t*0.28+J(0.03), t*0.16+J(0.03), 'mb');
+    }
+    for(let i=0;i<20;i++){ // alpha lobe (vertical, ascending)
+      const t=R();
+      add(side*(0.135-0.015*t)+J(0.025), 0.05+t*0.22+J(0.02), 0.15-t*0.04+J(0.02), 'mb');
+    }
+    for(let i=0;i<20;i++){ // beta lobe (medial, horizontal)
+      const t=R();
+      add(side*(0.13-0.10*t)+J(0.02), 0.02+J(0.02), 0.16-t*0.02+J(0.02), 'mb');
+    }
+    for(let i=0;i<20;i++){ // gamma lobe (medial, slightly ventral)
+      const t=R();
+      add(side*(0.125-0.09*t)+J(0.02), -0.04+J(0.02), 0.19-t*0.02+J(0.02), 'mb');
+    }
+  }
+  // ---- central complex (ellipsoid body ring + fan-shaped body columns + noduli) ----
+  for(let i=0;i<55;i++){ // ellipsoid body: a ring in the frontal plane
+    const a=R()*TAU;
+    add(Math.cos(a)*0.13, 0.24+Math.sin(a)*0.115, 0.03+J(0.025), 'cx');
+  }
+  for(let i=0;i<80;i++){ // fan-shaped body: 9 striated columns
+    const col=(R()*9)|0, row=R();
+    add(-0.105+col*0.0262+J(0.008), 0.115+row*0.05, -0.06-J(row)*0.05, 'cx');
+  }
+  for(let i=0;i<18;i++){ // noduli
+    const s=R()<0.5?-1:1;
+    add(s*0.035+J(0.02), 0.06+J(0.02), -0.02+J(0.02), 'cx');
+  }
+  // ---- antennal lobes (both sides, glomeruli clusters) ----
+  for(let side=-1;side<=1;side+=2){
+    const ax=side*0.19, ay=-0.10, az=0.40;
+    for(let g=0;g<12;g++){
+      const gx=ax+J(0.16), gy=ay+J(0.15), gz=az+J(0.15);
+      for(let i=0;i<10;i++){
+        add(gx+J(0.055), gy+J(0.055), gz+J(0.055), 'al');
+      }
+    }
+  }
+  // ---- lateral horns (both sides) ----
+  for(let side=-1;side<=1;side+=2){
+    for(let i=0;i<45;i++){
+      const a=R()*TAU, r2=Math.sqrt(R());
+      add(side*0.30+Math.cos(a)*r2*0.07, 0.08+Math.sin(a)*r2*0.09, 0.24+J(0.16), 'lh');
+    }
+  }
+  // ---- subesophageal ganglion (two lobes around the esophagus) ----
+  for(let i=0;i<120;i++){
+    const s=R()<0.5?-1:1;
+    const a=R()*TAU, r2=Math.sqrt(R());
+    add(s*(0.06+r2*0.18), -0.38+Math.sin(a)*r2*0.15, 0.14+Math.cos(a)*r2*0.20, 'sega');
+  }
+  // ---- cervical connective + ventral nerve cord (segmented) ----
+  for(let i=0;i<35;i++){
+    const t=R();
+    add(J(0.07), -0.52-t*0.26, 0.05-t*0.17, 'vnc');
+  }
+  for(let seg=0;seg<4;seg++){
+    const sy=-0.82-seg*0.10, sz=-0.16-seg*0.05, s=1-seg*0.16;
+    for(let i=0;i<29;i++){
+      const a=R()*TAU, r2=Math.sqrt(R());
+      add(Math.cos(a)*r2*0.10*s, sy+Math.sin(a)*r2*0.075*s, sz+J(0.16*s), 'vnc');
+    }
+  }
+
+  // ---- synapses: spatial hash + nearest-neighbor wiring ----
+  const CELL=0.17, grid=new Map();
+  for(let i=0;i<pts.length;i++){
+    const k=((pts[i].p[0]/CELL)|0)+'_'+((pts[i].p[1]/CELL)|0)+'_'+((pts[i].p[2]/CELL)|0);
+    (grid.get(k)||grid.set(k,[]).get(k)).push(i);
+  }
+  const R2=CELL*CELL;
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i].p, cx=(p[0]/CELL)|0, cy=(p[1]/CELL)|0, cz=(p[2]/CELL)|0;
+    const cand=[];
+    for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(let c=-1;c<=1;c++){
+      const cell=grid.get((cx+a)+'_'+(cy+b)+'_'+(cz+c)); if(!cell)continue;
+      for(const j of cell){ if(j===i)continue;
+        const q=pts[j].p, ddx=p[0]-q[0],ddy=p[1]-q[1],ddz=p[2]-q[2], d2=ddx*ddx+ddy*ddy+ddz*ddz;
+        if(d2<R2) cand.push([d2,j]);
+      }
+    }
+    cand.sort((a,b)=>a[0]-b[0]);
+    for(let n=0;n<Math.min(3,cand.length);n++){
+      const j=cand[n][1];
+      if(!pts[i].edges.includes(j)){ pts[i].edges.push(j); pts[j].edges.push(i); }
+    }
+  }
+  return pts;
+}
+
+/* ================= fly body ghost (faint wireframe, anatomy reference only) ================= */
+const FLY_BODY=(function(){
+  const L=[];
+  const line=a=>{if(a.length>1)L.push(a);};
+  const latRing=(cx,cy,cz,rx,ry,rz,phi,n)=>{
+    const a=[];for(let i=0;i<=n;i++){const t=i/n*TAU,c=Math.cos(phi);
+      a.push([cx+rx*c*Math.cos(t), cy+ry*Math.sin(phi), cz+rz*c*Math.sin(t)]);}
+    return a;};
+  const frontRing=(cx,cy,cz,rx,ry,n)=>{
+    const a=[];for(let i=0;i<=n;i++){const t=i/n*TAU;
+      a.push([cx+rx*Math.cos(t), cy+ry*Math.sin(t), cz]);}
+    return a;};
+  const seg=(x1,y1,z1,x2,y2,z2,n)=>{
+    const a=[];for(let i=0;i<=n;i++){const t=i/n;
+      a.push([x1+(x2-x1)*t, y1+(y2-y1)*t, z1+(z2-z1)*t]);}
+    return a;};
+  // head capsule (wraps the whole brain)
+  for(const phi of [-0.9,-0.45,0,0.45,0.9]) line(latRing(0,0.06,0.02,1.14,0.60,0.58,phi,44));
+  // compound eye outlines
+  for(const s of [-1,1]) line(frontRing(s*0.70,0.14,0.30,0.40,0.32,30));
+  // antennae
+  for(const s of [-1,1]){
+    line(seg(s*0.10,0.12,0.56,s*0.16,0.03,0.72,5));
+    line(seg(s*0.16,0.03,0.72,s*0.13,-0.05,0.80,4));
+  }
+  // thorax
+  for(const phi of [-0.8,-0.4,0,0.4,0.8]) line(latRing(0,-0.82,-0.02,0.62,0.42,0.54,phi,36));
+  // abdomen (segmented rings + dorsal midline)
+  for(const [cy,rx,rz] of [[-1.20,0.38,0.40],[-1.42,0.31,0.33],[-1.60,0.24,0.26]]){
+    const a=[];for(let i=0;i<=30;i++){const t=i/30*TAU;
+      a.push([rx*Math.cos(t), cy, -0.02+rz*Math.sin(t)]);}
+    line(a);
+  }
+  line(seg(0,-1.08,-0.02,0,-1.70,-0.02,9));
+  // wings (half-spread elliptical outline + veins)
+  for(const s of [-1,1]){
+    const d=[s*0.91,-0.10,-0.40];
+    const dl=Math.hypot(d[0],d[1],d[2]);for(let i=0;i<3;i++)d[i]/=dl;
+    const w=[0,-0.92,0.20];
+    const wl=Math.hypot(w[0],w[1],w[2]);for(let i=0;i<3;i++)w[i]/=wl;
+    const ax=s*0.52, ay=-0.55, az=-0.30, len=1.15, b=0.14;
+    const mx=ax+d[0]*len/2, my=ay+d[1]*len/2, mz=az+d[2]*len/2;
+    const a=[];for(let i=0;i<=34;i++){const t=i/34*TAU,ca=len/2*Math.cos(t),sb=b*Math.sin(t);
+      a.push([mx+d[0]*ca+w[0]*sb, my+d[1]*ca+w[1]*sb, mz+d[2]*ca+w[2]*sb]);}
+    line(a);
+    for(const off of [b*0.4,-b*0.4])
+      line(seg(ax,ay,az, ax+d[0]*len*0.8+w[0]*off, ay+d[1]*len*0.8+w[1]*off, az+d[2]*len*0.8+w[2]*off, 9));
+  }
+  // legs (front / mid / hind, three segments each)
+  for(const s of [-1,1]){
+    const legs=[
+      [[0.44,-0.58,0.30],[0.78,-0.88,0.46],[0.86,-1.18,0.50],[0.90,-1.38,0.50]],
+      [[0.50,-0.76,0.02],[0.84,-1.00,0.14],[0.94,-1.30,0.18],[0.98,-1.48,0.18]],
+      [[0.48,-0.92,-0.26],[0.84,-1.14,-0.40],[0.94,-1.38,-0.42],[0.98,-1.52,-0.42]]
+    ];
+    for(const lg of legs)for(let k=0;k<3;k++){
+      const A=lg[k],B=lg[k+1];
+      line(seg(s*A[0],A[1],A[2], s*B[0],B[1],B[2], 7));
+    }
+  }
+  return L;
+})();
+const FLY_BODY_VCOUNT=FLY_BODY.reduce((n,p)=>n+p.length,0);
+
+/* ================= brain renderer ================= */
+const CALLOUTS=[
+  {r:'medulla', ax:0.855, ay:0.13, code:'MD ▸ MEDULLA'},
+  {r:'mb',      ax:0.875, ay:0.42, code:'MB ▸ MUSHROOM BODY'},
+  {r:'cx',      ax:0.835, ay:0.66, code:'CX ▸ CENTRAL COMPLEX'},
+  {r:'al',      ax:0.125, ay:0.15, code:'AL ▸ ANTENNAL LOBE'}
+];
+function BrainCanvas(canvas, opts){
+  this.cv=canvas; this.ctx=canvas.getContext('2d');
+  this.pts=buildFlyBrain();
+  this.rot={y:opts.rotY||0, x:opts.rotX||0.14};
+  this.auto=opts.autoRotate!==false;
+  this.autoSpeed=opts.autoSpeed||0.14;
+  this.scaleK=opts.scale||0.32;
+  this.lift=opts.lift!==undefined?opts.lift:0.06;
+  this.opts=opts;
+  this.highlight=null;
+  this.visible=true;
+  this.mouse={x:-9999,y:-9999,in:false};
+  this.dragging=false; this.lastMX=0; this.lastMY=0;
+  this.pulses=[]; this.rings=[]; this.queue=[];
+  this.edgeBoost=0; this.globalGlow=0;
+  this.sweepT=Math.random()*8;
+  this.proj=new Float32Array(this.pts.length*3);
+  this.cyF=opts.cyF||0.5;
+  if(opts.body){
+    this.body=FLY_BODY;
+    this.bodyProj=new Float32Array(FLY_BODY_VCOUNT*3);
+  }else{this.body=null;}
+  this.dpr=Math.min(devicePixelRatio||1,2);
+
+  const cv=this.cv;
+  this.resize();
+  addEventListener('resize',()=>this.resize());
+
+  cv.addEventListener('pointerdown',e=>{
+    this.dragging=true; this.lastMX=e.clientX; this.lastMY=e.clientY;
+    cv.setPointerCapture(e.pointerId);
+    if(opts.clickable){
+      const r=cv.getBoundingClientRect();
+      this.burst(e.clientX-r.left, e.clientY-r.top);
+    }
+  });
+  cv.addEventListener('pointermove',e=>{
+    const r=cv.getBoundingClientRect();
+    this.mouse.x=e.clientX-r.left; this.mouse.y=e.clientY-r.top; this.mouse.in=true;
+    if(this.dragging){
+      this.rot.y += (e.clientX-this.lastMX)*0.006;
+      this.rot.x = clamp(this.rot.x+(e.clientY-this.lastMY)*0.005,-0.9,0.9);
+      this.lastMX=e.clientX; this.lastMY=e.clientY;
+    }
+  });
+  cv.addEventListener('pointerup',()=>{this.dragging=false;});
+  cv.addEventListener('pointerleave',()=>{this.dragging=false;this.mouse.in=false;this.mouse.x=-9999;});
+}
+BrainCanvas.prototype.resize=function(){
+  const w=this.cv.clientWidth, h=this.cv.clientHeight;
+  this.w=w; this.h=h;
+  this.cv.width=Math.max(2,w*this.dpr); this.cv.height=Math.max(2,h*this.dpr);
+  this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
+};
+BrainCanvas.prototype.burst=function(x,y){
+  this.rings.push({x:x,y:y,r:6,a:1});
+  let n=0;
+  for(let i=0;i<this.pts.length && n<46;i++){
+    if(Math.random()<0.05){
+      const o=i*3;
+      const dx=this.proj[o]-x, dy=this.proj[o+1]-y;
+      if(dx*dx+dy*dy<7600){ this.pts[i].e=2.4; n++; }
+    }
+  }
+};
+BrainCanvas.prototype.project=function(){
+  const cy=Math.cos(this.rot.y), sy=Math.sin(this.rot.y);
+  const cx=Math.cos(this.rot.x), sx=Math.sin(this.rot.x);
+  const s=Math.min(this.w,this.h)*this.scaleK, CX=this.w/2, CY=this.h*this.cyF;
+  const pr=this.proj;
+  for(let i=0;i<this.pts.length;i++){
+    const p=this.pts[i].p;
+    const ym=p[1]-this.lift;
+    const x1=p[0]*cy+p[2]*sy, z1=-p[0]*sy+p[2]*cy;
+    const y1=ym*cx-z1*sx,     z2=ym*sx+z1*cx;
+    const k=3.3/(3.3+z2);
+    pr[i*3]=CX+x1*s*k; pr[i*3+1]=CY-y1*s*k; pr[i*3+2]=k;
+  }
+  if(this.body){
+    const bp=this.bodyProj;
+    let o=0;
+    for(const poly of this.body){
+      for(const v of poly){
+        const ym=v[1]-this.lift;
+        const x1=v[0]*cy+v[2]*sy, z1=-v[0]*sy+v[2]*cy;
+        const y1=ym*cx-z1*sx,     z2=ym*sx+z1*cx;
+        const k=3.3/(3.3+z2);
+        bp[o++]=CX+x1*s*k; bp[o++]=CY-y1*s*k; bp[o++]=k;
+      }
+    }
+  }
+};
+BrainCanvas.prototype.update=function(dt,time){
+  while(this.queue.length && this.queue[0].at<=time){ this.queue.shift().fn(); }
+  this.queue.sort((a,b)=>a.at-b.at);
+  // spontaneous firing (driven by global activity)
+  let fireN = dt*5.5*SIM.act;
+  while(fireN>0){ if(fireN>1 || Math.random()<fireN) this.fire(this.pts[(Math.random()*this.pts.length)|0]); fireN--; }
+  // cursor stimulation (screen space)
+  if(this.mouse.in && !this.dragging){
+    const r2=8100, m=this.mouse;
+    for(let i=0;i<this.pts.length;i++){
+      const o=i*3, dx=this.proj[o]-m.x, dy=this.proj[o+1]-m.y;
+      if(dx*dx+dy*dy<r2) this.pts[i].e=Math.min(2.2,this.pts[i].e+dt*7);
+    }
+  }
+  // atlas highlight: keep the selected region firing
+  if(this.highlight){
+    for(const pt of this.pts) if(pt.r===this.highlight && Math.random()<dt*2.2) this.fire(pt);
+  }
+  // decay and ignition
+  const decay=Math.exp(-dt*1.9);
+  for(const pt of this.pts){
+    pt.e*=decay;
+    if(pt.cool>0)pt.cool-=dt;
+    if(pt.e>1.0 && pt.cool<=0){
+      pt.e=0.25; pt.cool=0.16;
+      const n=pt.edges;
+      for(let k=0;k<n.length && k<3;k++){
+        if(Math.random()<0.75) this.spawnPulse(pt,n[k]);
+      }
+      SIM.spikeBump(dt);
+    }
+  }
+  // pulse propagation
+  for(let i=this.pulses.length-1;i>=0;i--){
+    const pu=this.pulses[i];
+    pu.t+=dt*pu.sp;
+    if(pu.t>=1){
+      const tg=this.pts[pu.b];
+      tg.e=Math.min(2.0,tg.e+0.6);
+      this.pulses.splice(i,1);
+    }
+  }
+  if(this.pulses.length>650) this.pulses.splice(0,this.pulses.length-650);
+  this.edgeBoost=Math.max(0,this.edgeBoost-dt*0.25);
+  this.globalGlow=Math.max(0,this.globalGlow-dt*0.5);
+  for(let i=this.rings.length-1;i>=0;i--){
+    const g=this.rings[i]; g.r+=dt*260; g.a-=dt*1.6;
+    if(g.a<=0)this.rings.splice(i,1);
+  }
+  if(this.auto && !this.dragging) this.rot.y+=dt*this.autoSpeed;
+  // holographic scan sweep
+  this.sweepT=(this.sweepT+dt)%8;
+  this.sweepY=-1;
+  if(this.sweepT<2){
+    this.sweepY=this.h*(this.sweepT/2);
+    for(let i=0;i<this.pts.length;i++){
+      const o=i*3;
+      if(Math.abs(this.proj[o+1]-this.sweepY)<5) this.pts[i].e=Math.max(this.pts[i].e,0.55);
+    }
+  }
+};
+BrainCanvas.prototype.fire=function(pt){
+  pt.e=Math.max(pt.e,0.6); pt.cool=0.14;
+  const n=pt.edges;
+  for(let k=0;k<n.length;k++){ if(Math.random()<0.7) this.spawnPulse(pt,n[k]); }
+};
+BrainCanvas.prototype.spawnPulse=function(a,bIdx){
+  if(this.pulses.length>680)return;
+  this.pulses.push({ai:a.idx, b:bIdx, t:0, sp:2.2+Math.random()*2.4});
+};
+BrainCanvas.prototype.fx=function(kind,time){
+  const t0=time;
+  if(kind==='grating'){ // grating sweeps belly-to-back across both optic lobes
+    for(let s=0;s<12;s++){
+      this.queue.push({at:t0+s*0.07, fn:()=>{
+        const yc=-0.45+s*0.085;
+        for(const pt of this.pts){
+          if((pt.r==='medulla'||pt.r==='lobula') && Math.abs(pt.p[1]-yc)<0.09) pt.e=2.2;
+        }
+      }});
+    }
+  }else if(kind==='odor'){ // glomeruli light up in a combinatorial pattern
+    for(let s=0;s<6;s++){
+      this.queue.push({at:t0+s*0.12, fn:()=>{
+        for(let k=0;k<24;k++){
+          const pt=this.pts[(Math.random()*this.pts.length)|0];
+          if(pt.r==='al') pt.e=2.3;
+        }
+        for(let k=0;k<6;k++){
+          const pt=this.pts[(Math.random()*this.pts.length)|0];
+          if(pt.r==='lh') pt.e=1.8;
+        }
+      }});
+    }
+  }else if(kind==='memory'){ // PPL1 dopamine sweeps the mushroom body calyx → peduncle → lobes
+    const mbp=this.pts.filter(p=>p.r==='mb');
+    const slices=12;
+    for(let s=0;s<slices;s++){
+      this.queue.push({at:t0+s*0.13, fn:()=>{
+        const hi=0.36-s*(0.42/slices), lo=hi-0.42/slices;
+        for(const pt of mbp) if(pt.p[1]<hi && pt.p[1]>lo) pt.e=2.5;
+      }});
+    }
+    for(let i=0;i<40;i++){
+      const pt=this.pts[(Math.random()*this.pts.length)|0];
+      if(pt.r==='cx') pt.e=1.5;
+    }
+  }else if(kind==='ltp'){
+    this.edgeBoost=1;
+    for(let i=0;i<90;i++){ const pt=this.pts[(Math.random()*this.pts.length)|0]; pt.e=Math.max(pt.e,1.2); }
+  }
+};
+BrainCanvas.prototype.draw=function(time){
+  const ctx=this.ctx, pr=this.proj, pts=this.pts;
+  ctx.fillStyle='rgba(3,8,11,0.5)';
+  ctx.fillRect(0,0,this.w,this.h);
+
+  const C=this.w/2, CY=this.h*this.cyF - this.lift*Math.min(this.w,this.h)*this.scaleK*0.9;
+
+  // ---- holographic projector base (hero only) ----
+  if(this.opts.holo){
+    const bx=this.w*0.52, by=this.h*0.905, rx=Math.min(this.w,this.h)*0.24;
+    const g=ctx.createLinearGradient(0,by,0,CY);
+    g.addColorStop(0,'rgba(61,255,176,0.055)');
+    g.addColorStop(1,'rgba(61,255,176,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(bx-rx,by); ctx.lineTo(bx-rx*0.32,CY-40); ctx.lineTo(bx+rx*0.32,CY-40); ctx.lineTo(bx+rx,by);
+    ctx.closePath(); ctx.fill();
+    for(let i=0;i<3;i++){
+      const s=1+i*0.42;
+      ctx.strokeStyle='rgba(61,255,176,'+((0.17-0.045*i)*(0.72+0.28*Math.sin(time*2.2+i*1.4))).toFixed(3)+')';
+      ctx.lineWidth=1;
+      ctx.beginPath(); ctx.ellipse(bx,by,rx*s,rx*s*0.26,0,0,TAU); ctx.stroke();
+    }
+  }
+  // ---- HUD rotating tick ring ----
+  if(this.opts.reticule){
+    const R0=Math.min(this.w,this.h)*0.44;
+    ctx.save();
+    ctx.translate(C,CY);
+    ctx.rotate(time*0.06);
+    for(let i=0;i<48;i++){
+      const a=i/48*TAU, long=i%4===0;
+      ctx.strokeStyle='rgba(61,255,176,'+(long?0.28:0.14)+')';
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*R0, Math.sin(a)*R0);
+      ctx.lineTo(Math.cos(a)*(R0+(long?9:4)), Math.sin(a)*(R0+(long?9:4)));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // counter-rotating arcs
+    ctx.strokeStyle='rgba(94,230,255,0.14)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(C,CY,R0+16, time*-0.12, time*-0.12+1.1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(C,CY,R0+16, time*-0.12+Math.PI, time*-0.12+Math.PI+1.1); ctx.stroke();
+  }
+
+  // ---- body ghost (faint wireframe, rotates with the specimen, not simulated) ----
+  if(this.body){
+    const bp=this.bodyProj;
+    let o=0;
+    ctx.lineWidth=1;
+    for(const poly of this.body){
+      let ysum=0;
+      for(let i=0;i<poly.length;i++) ysum+=bp[o+i*3+1];
+      const avgY=ysum/poly.length;
+      let a=0.125;
+      if(this.sweepY>=0 && Math.abs(avgY-this.sweepY)<70)
+        a+=0.17*(1-Math.abs(avgY-this.sweepY)/70);
+      ctx.strokeStyle='rgba(110,190,155,'+a.toFixed(3)+')';
+      ctx.beginPath();
+      ctx.moveTo(bp[o],bp[o+1]);
+      for(let i=1;i<poly.length;i++) ctx.lineTo(bp[o+i*3],bp[o+i*3+1]);
+      ctx.stroke();
+      o+=poly.length*3;
+    }
+  }
+
+  // ---- synapses (tinted by region) ----
+  const eb=this.edgeBoost;
+  ctx.lineWidth=1;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], oa=i*3;
+    const ea=clamp(0.05+(a.e*0.22)+eb*0.12,0,0.55);
+    if(ea<0.06 && !eb)continue;
+    const cA=REGIONS[a.r].rgb;
+    const hiA = this.highlight ? (a.r===this.highlight?1.6:0.25) : 1;
+    for(const j of a.edges){
+      if(j<i)continue;
+      const b=pts[j], ob=j*3;
+      const e2=clamp(ea+b.e*0.22+eb*0.12,0.02,0.6);
+      const hiB = this.highlight ? (b.r===this.highlight?1.6:0.25) : 1;
+      const alpha=(e2*hiA*0.85).toFixed(3);
+      ctx.strokeStyle='rgba('+cA[0]+','+cA[1]+','+cA[2]+','+alpha+')';
+      ctx.beginPath();
+      ctx.moveTo(pr[oa],pr[oa+1]);
+      ctx.lineTo(pr[ob],pr[ob+1]);
+      ctx.stroke();
+    }
+  }
+  // ---- neurons (additive glow) ----
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<pts.length;i++){
+    const pt=pts[i], o=i*3, k=pr[o+2];
+    const def=REGIONS[pt.r];
+    const c=def.rgb;
+    const e=pt.e + (this.highlight===pt.r?0.35:0) + this.globalGlow*0.3;
+    const br=clamp((0.30+e*0.7)*def.br,0,1);
+    const dim = this.highlight&&pt.r!==this.highlight ? 0.22 : 1;
+    const r=(1.1+e*1.4)*k*def.sz;
+    ctx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+(br*dim).toFixed(3)+')';
+    ctx.beginPath();ctx.arc(pr[o],pr[o+1],r,0,TAU);ctx.fill();
+    if(e>0.75){
+      ctx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+((e-0.75)*0.24*dim).toFixed(3)+')';
+      ctx.beginPath();ctx.arc(pr[o],pr[o+1],r*3.2,0,TAU);ctx.fill();
+    }
+  }
+  // ---- pulses ----
+  for(const pu of this.pulses){
+    const oa=pu.ai*3, ob=pu.b*3;
+    const x=pr[oa]+(pr[ob]-pr[oa])*pu.t, y=pr[oa+1]+(pr[ob+1]-pr[oa+1])*pu.t;
+    const c=REGIONS[pts[pu.b].r].rgb;
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath();ctx.arc(x,y,1.4,0,TAU);ctx.fill();
+    ctx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+',0.3)';
+    ctx.beginPath();ctx.arc(x,y,3.6,0,TAU);ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+  // ---- click shockwaves ----
+  for(const g of this.rings){
+    ctx.strokeStyle='rgba(255,194,71,'+(g.a*0.7).toFixed(3)+')';
+    ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.arc(g.x,g.y,g.r,0,TAU);ctx.stroke();
+    ctx.strokeStyle='rgba(61,255,176,'+(g.a*0.4).toFixed(3)+')';
+    ctx.beginPath();ctx.arc(g.x,g.y,g.r*0.6,0,TAU);ctx.stroke();
+  }
+  // ---- holographic scan line ----
+  if(this.sweepY>=0){
+    const y=this.sweepY;
+    const g=ctx.createLinearGradient(0,y-56,0,y);
+    g.addColorStop(0,'rgba(61,255,176,0)');
+    g.addColorStop(1,'rgba(61,255,176,0.07)');
+    ctx.fillStyle=g; ctx.fillRect(0,y-56,this.w,56);
+    ctx.strokeStyle='rgba(61,255,176,0.5)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(this.w,y);ctx.stroke();
+  }
+  // ---- region callout labels (hero only) ----
+  if(this.opts.callouts && this.w>760){
+    const sum={}, cnt={};
+    for(const pt of pts){
+      const o=pt.idx*3;
+      (sum[pt.r]||(sum[pt.r]=[0,0,0],cnt[pt.r]=0));
+      sum[pt.r][0]+=pr[o]; sum[pt.r][1]+=pr[o+1]; sum[pt.r][2]+=pr[o+2]; cnt[pt.r]++;
+    }
+    ctx.font='10px monospace';
+    for(let ci=0;ci<CALLOUTS.length;ci++){
+      const cl=CALLOUTS[ci];
+      if(!sum[cl.r])continue;
+      const cxA=sum[cl.r][0]/cnt[cl.r], cyA=sum[cl.r][1]/cnt[cl.r], kA=sum[cl.r][2]/cnt[cl.r];
+      const c=REGIONS[cl.r].rgb;
+      const flick=0.55+0.14*Math.sin(time*6+ci*2.1);
+      const alpha=flick*(kA<0.97?0.62:1);
+      const ax=this.w*cl.ax, ay=this.h*cl.ay;
+      ctx.strokeStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+(alpha*0.5).toFixed(3)+')';
+      ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(cxA,cyA);ctx.lineTo(ax,ay);ctx.stroke();
+      ctx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+alpha.toFixed(3)+')';
+      ctx.fillRect(ax-2,ay-2,4,4);
+      ctx.strokeStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+(alpha*0.9).toFixed(3)+')';
+      ctx.strokeRect(ax-5,ay-5,10,10);
+      ctx.textAlign = ax<this.w/2 ? 'left' : 'right';
+      ctx.fillStyle='rgba(217,255,233,'+alpha.toFixed(3)+')';
+      ctx.fillText(cl.code, ax+(ax<this.w/2?10:-10), ay+3);
+    }
+    ctx.textAlign='left';
+  }
+};
+for(const k in REGIONS) REGIONS[k].rgb=hexRGB(REGIONS[k].color);
+
+/* ================= global simulation state ================= */
+const SIM={
+  spike:46, volt:-64.9, syn:12840, dopa:28.6, act:1, eegEnv:0.3,
+  _bump:0,
+  spikeBump(){this._bump=Math.min(60,this._bump+1.1);},
+  stim(kind){
+    const t=performance.now()/1000;
+    if(kind==='grating'){ this.act=Math.max(this.act,2.4); this.eegEnv=0.9; brain.fx('grating',t); flash(); }
+    else if(kind==='odor'){ this.act=Math.max(this.act,1.8); this.dopa+=6; this.eegEnv=0.7; brain.fx('odor',t); }
+    else if(kind==='memory'){ this.dopa+=22; this.act=Math.max(this.act,1.4); this.eegEnv=0.6; brain.fx('memory',t); }
+    else if(kind==='ltp'){ this.syn+=320; this.eegEnv=0.5; brain.fx('ltp',t); }
+    if(brain2) brain2.fx(kind,t);
+  }
+};
+function flash(){
+  const f=document.getElementById('flash');
+  f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),160);
+}
+
+/* ================= canvases ================= */
+const brain = new BrainCanvas(document.getElementById('brain'),{
+  scale:0.26, autoSpeed:reduceMotion?0.04:0.12, clickable:true,
+  holo:true, reticule:true, callouts:true, lift:0.16, cyF:0.44, body:true
+});
+const brain2 = new BrainCanvas(document.getElementById('brain2'),{
+  scale:0.285, autoSpeed:reduceMotion?0.03:0.09, rotX:0.10, lift:0.10
+});
+// pause rendering while offscreen
+new IntersectionObserver(es=>{es.forEach(en=>{ if(en.target===brain.cv)brain.visible=en.isIntersecting; });},{threshold:0.02}).observe(brain.cv);
+new IntersectionObserver(es=>{es.forEach(en=>{ brain2.visible=en.isIntersecting; });},{threshold:0.02}).observe(brain2.cv);
+
+/* ================= telemetry panel ================= */
+const $=id=>document.getElementById(id);
+const sparkCtx={}, METRICS=[
+  {id:'spike'},{id:'volt'},{id:'syn'},{id:'dopa'}
+];
+for(const m of METRICS){
+  const c=$('spark-'+m.id); c.__hist=[];
+  const dpr=Math.min(devicePixelRatio||1,2);
+  function fit(){ c.width=c.clientWidth*dpr; c.height=34*dpr; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
+  fit(); addEventListener('resize',fit);
+  sparkCtx[m.id]=c;
+}
+function drawSpark(c,color){
+  const h=c.__hist; if(h.length<2)return;
+  const ctx=c.getContext('2d'), w=c.clientWidth, H=34;
+  ctx.clearRect(0,0,w,H);
+  let mn=Infinity,mx=-Infinity; for(const v of h){if(v<mn)mn=v;if(v>mx)mx=v;}
+  const rg=(mx-mn)||1;
+  ctx.beginPath();
+  for(let i=0;i<h.length;i++){
+    const x=i/(h.length-1)*w, y=H-4-((h[i]-mn)/rg)*(H-8);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=1.4; ctx.stroke();
+  const ly=H-4-((h[h.length-1]-mn)/rg)*(H-8);
+  ctx.fillStyle=color;ctx.beginPath();ctx.arc(w-1,ly,2,0,TAU);ctx.fill();
+}
+setInterval(()=>{
+  for(const m of METRICS){
+    const c=sparkCtx[m.id];
+    c.__hist.push(SIM[m.id]); if(c.__hist.length>64)c.__hist.shift();
+  }
+  drawSpark(sparkCtx.spike,'#3dffb0');
+  drawSpark(sparkCtx.volt,'#5ee6ff');
+  drawSpark(sparkCtx.syn,'#a78bff');
+  drawSpark(sparkCtx.dopa,'#ffc247');
+},280);
+
+/* ================= LFP waveform ================= */
+const eeg=$('eeg'); const ectx=eeg.getContext('2d');
+const CH=[{n:'δ DELTA',c:'#3dffb0',f:1.7,a:.9},{n:'θ THETA',c:'#5ee6ff',f:3.1,a:.7},{n:'α ALPHA',c:'#ffc247',f:5.3,a:.55},{n:'γ GAMMA',c:'#ff7eb6',f:9.2,a:.4}];
+const edpr=Math.min(devicePixelRatio||1,2);
+function eegFit(){ eeg.width=eeg.clientWidth*edpr; eeg.height=170*edpr; ectx.setTransform(edpr,0,0,edpr,0,0); }
+eegFit(); addEventListener('resize',eegFit);
+const eegPh=CH.map(()=>Math.random()*10);
+const eegBuf=CH.map(()=>[]);
+function eegStep(dt){
+  const w=eeg.clientWidth;
+  for(let ci=0;ci<CH.length;ci++){
+    eegPh[ci]+=dt*CH[ci].f;
+    const env=0.35+(SIM.act-1)*0.55+SIM.eegEnv*0.9;
+    const v=Math.sin(eegPh[ci]*TAU*0.7)*CH[ci].a + Math.sin(eegPh[ci]*TAU*1.9+1.3)*CH[ci].a*0.4 + (Math.random()-.5)*0.35;
+    const buf=eegBuf[ci];
+    buf.push(v*env*14);
+    const maxN=Math.ceil(w/2);
+    if(buf.length>maxN)buf.splice(0,buf.length-maxN);
+  }
+  SIM.eegEnv=Math.max(0,SIM.eegEnv-dt*0.5);
+}
+function eegDraw(){
+  const w=eeg.clientWidth,H=170,rowH=H/4;
+  ectx.clearRect(0,0,w,H);
+  ectx.strokeStyle='rgba(61,255,176,0.07)';ectx.lineWidth=1;
+  for(let i=1;i<4;i++){ectx.beginPath();ectx.moveTo(0,i*rowH);ectx.lineTo(w,i*rowH);ectx.stroke();}
+  for(let ci=0;ci<CH.length;ci++){
+    const mid=ci*rowH+rowH/2, buf=eegBuf[ci];
+    ectx.beginPath();
+    const x0=w-buf.length*2;
+    for(let i=0;i<buf.length;i++){
+      const x=x0+i*2, y=mid-buf[i];
+      i?ectx.lineTo(x,y):ectx.moveTo(x,y);
+    }
+    ectx.strokeStyle=CH[ci].c; ectx.lineWidth=1.3;
+    ectx.shadowColor=CH[ci].c; ectx.shadowBlur=5;
+    ectx.stroke(); ectx.shadowBlur=0;
+    ectx.fillStyle='rgba(217,255,233,0.5)';
+    ectx.font='9px monospace';
+    ectx.fillText(CH[ci].n, 8, ci*rowH+14);
+  }
+}
+
+/* ================= event stream ================= */
+const stream=$('stream');
+function nowStr(){
+  const d=new Date();
+  const p=(n,l=2)=>String(n).padStart(l,'0');
+  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'.'+p(d.getMilliseconds(),3);
+}
+const TAGCLS={SENSE:'sense',MOTOR:'motor',LEARN:'learn',NAV:'sys',SYS:'sys',STIM:'stim'};
+function log(tag,msg){
+  const el=document.createElement('div');
+  el.className='log-line';
+  el.innerHTML='<span class="lt">'+nowStr()+'</span><span class="tag tag-'+TAGCLS[tag]+'">'+tag+'</span><span class="lm">'+msg+'</span>';
+  stream.prepend(el);
+  while(stream.children.length>36)stream.lastChild.remove();
+}
+const AMBIENT=[
+  ['SENSE','Direction-selective T4/T5 burst → rightward optic-flow component detected'],
+  ['SENSE','ORN ab3A spike rate +18% → glomerulus DM6 activated'],
+  ['SENSE','Phototransduction in R1-R6 · quantum bump capture rate 0.42'],
+  ['MOTOR','Giant fiber pathway fires → escape-jump pre-command in 5.2 ms'],
+  ['MOTOR','DVM flight muscles in sync · wingbeat 200 Hz · heading correction -4°'],
+  ['MOTOR','Leg gait pacemaker · tripod-gait phase advanced to 0.61'],
+  ['LEARN','PPL1-γ1 dopamine signal → KCα′β′-MBON weights down (aversive)'],
+  ['LEARN','PAM-β1 reward signal → KCγ-MBON weights up (sugar / calories)'],
+  ['LEARN','Kenyon sparse code: 6.2% of 4,000 cells represent the current odor'],
+  ['NAV','Ellipsoid body bump slides → heading updated +14°'],
+  ['SYS','Sleep window: antennae down · eyes silent · LFP synchrony 0.61'],
+  ['SYS','Potassium channels recycled · synaptic cleft back to baseline']
+];
+let lastAmbient=0;
+function ambientTick(time){
+  if(time-lastAmbient>2.2+Math.random()*2.6){
+    lastAmbient=time;
+    const a=AMBIENT[(Math.random()*AMBIENT.length)|0];
+    log(a[0],a[1]);
+  }
+}
+
+/* ================= stim buttons ================= */
+document.querySelectorAll('.stim').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const kind=btn.dataset.stim;
+    SIM.stim(kind);
+    btn.classList.remove('fired'); void btn.offsetWidth; btn.classList.add('fired');
+    const NAMES={grating:'Optic Flow',odor:'Odor Puff',memory:'Memory Write',ltp:'Potentiation'};
+    const DETAIL={
+      grating:'Moving grating cast onto both optic lobes → T4/T5 erupt layer by layer · optomotor response -18°',
+      odor:'Acetate molecules released → glomeruli DM6/VA6 light up · lateral horn relaying',
+      memory:'Odor–shock pairing → PPL1 dopamine carves an aversive trace on the mushroom body α/β lobes',
+      ltp:'Long-term potentiation triggered · connection weights raised globally'};
+    log('STIM','['+NAMES[kind]+'] '+DETAIL[kind]);
+  });
+});
+
+/* ================= brain atlas ================= */
+const regionList=$('region-list');
+const TOTAL=139255;
+let activeRegion=null;
+for(const id in REGIONS){
+  const r=REGIONS[id];
+  const el=document.createElement('div');
+  el.className='region'; el.dataset.id=id;
+  el.innerHTML='<span class="rc" style="background:'+r.color+';box-shadow:0 0 8px '+r.color+'"></span>'+
+    '<div class="rn">'+r.name+'</div><div class="re">'+r.code+' · '+r.count.toLocaleString('en-US')+'</div>';
+  el.addEventListener('click',()=>selectRegion(id));
+  regionList.appendChild(el);
+}
+function selectRegion(id){
+  activeRegion=id;
+  brain2.highlight = (brain2.highlight===id)?null:id;
+  document.querySelectorAll('.region').forEach(el=>el.classList.toggle('on',el.dataset.id===brain2.highlight));
+  const r=REGIONS[id];
+  $('ri-cn').textContent=r.name;
+  $('ri-cn').style.color=r.color;
+  $('ri-en').textContent=r.code;
+  $('ri-desc').textContent=r.desc;
+  $('ri-count').textContent=r.count.toLocaleString('en-US');
+  $('ri-pct').textContent=(r.count/TOTAL*100).toFixed(1)+'%';
+  const bar=$('ri-bar');
+  bar.style.background=r.color; bar.style.boxShadow='0 0 10px '+r.color;
+  bar.style.animation='none'; void bar.offsetWidth; bar.style.animation='';
+  log('SYS','Region layer → '+r.name+' ('+r.code+')');
+}
+selectRegion('mb');
+brain2.highlight=null;
+document.querySelectorAll('.region').forEach(el=>el.classList.remove('on'));
+
+/* ================= mini waveforms (how-it-works cards) ================= */
+document.querySelectorAll('.wave').forEach((c,idx)=>{
+  const kind=c.dataset.wave;
+  const col={sense:'#5ee6ff',learn:'#ff7eb6',motor:'#ffc247'}[kind];
+  const dpr=Math.min(devicePixelRatio||1,2);
+  function fit(){c.width=c.clientWidth*dpr;c.height=26*dpr;c.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
+  fit();addEventListener('resize',fit);
+  c.__t=idx*2;
+  c.__draw=function(dt){
+    c.__t+=dt*(kind==='motor'?4:1.6);
+    const ctx=c.getContext('2d'),w=c.clientWidth,H=26;
+    ctx.clearRect(0,0,w,H);ctx.beginPath();
+    for(let x=0;x<w;x+=2){
+      let y;
+      if(kind==='sense')y=Math.sin(x*0.05+c.__t)*6*Math.abs(Math.sin(x*0.011+c.__t*0.7))+(Math.random()-.5)*2;
+      else if(kind==='learn')y=Math.tanh(Math.sin(x*0.06+c.__t))*8;
+      else y=Math.sin(x*0.16+c.__t*3)>0.2?(Math.random()*8-4):0;
+      x?ctx.lineTo(x,H/2+y):ctx.moveTo(x,H/2+y);
+    }
+    ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.globalAlpha=0.8;ctx.stroke();ctx.globalAlpha=1;
+  };
+});
+
+/* ================= clock ================= */
+setInterval(()=>{
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  $('clock').textContent='UTC+8 '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+},1000);
+
+/* ================= reveal on scroll ================= */
+const io=new IntersectionObserver(es=>{
+  es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);}});
+},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ================= main loop ================= */
+let prev=performance.now();
+let statTimer=0;
+function loop(now){
+  const dt=clamp((now-prev)/1000,0.001,0.05);
+  prev=now;
+  const time=now/1000;
+  // evolve simulation state
+  SIM.act+=(1-SIM.act)*Math.min(1,dt*0.45);
+  SIM.spike+=(46*SIM.act+SIM._bump+(Math.random()-.5)*6-SIM.spike)*Math.min(1,dt*3);
+  SIM._bump=Math.max(0,SIM._bump-dt*28);
+  SIM.volt+=((-64.9+(SIM.act-1)*3.2+(Math.random()-.5)*1.4)-SIM.volt)*Math.min(1,dt*2.5);
+  SIM.syn+=((12840*Math.min(SIM.act,2)+ (Math.random()-.5)*300)-SIM.syn)*Math.min(1,dt*1.6);
+  SIM.dopa+=((28.6+(SIM.act-1)*13)-SIM.dopa)*Math.min(1,dt*0.7);
+  statTimer+=dt;
+  if(statTimer>0.15){
+    statTimer=0;
+    $('stat-spike').textContent=SIM.spike.toFixed(1);
+    $('stat-volt').textContent=SIM.volt.toFixed(1);
+    $('stat-syn').textContent=Math.round(SIM.syn).toLocaleString('en-US');
+    $('stat-dopa').textContent=SIM.dopa.toFixed(1);
+  }
+  if(brain.visible){brain.project();brain.update(dt,time);brain.draw(time);}
+  if(brain2.visible){brain2.project();brain2.update(dt,time);brain2.draw(time);}
+  eegStep(dt);eegDraw();
+  document.querySelectorAll('.wave').forEach(c=>c.__draw&&c.__draw(dt));
+  ambientTick(time);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+log('SYS','NEUROFLY simulation core mounted · DROSOPHILA-01 digital twin awake');
+log('SYS','Connectome loaded: 139,255 neurons / ≈5.0×10⁷ synapses');
+})();
+</script>
+</body>
+</html>
